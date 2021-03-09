@@ -4,6 +4,9 @@ import cors from 'cors';
 import knex from 'knex';
 
 import { handleRegister } from './controllers/register.js';
+import { handleSignin } from './controllers/signin.js';
+import { handleProfileGet } from './controllers/profile.js';
+import { handleImage } from './controllers/image.js';
 
 const db = knex({
     client: 'pg',
@@ -20,55 +23,11 @@ app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(cors());
 
-
-app.get('/', (req, res) => {
-    res.send('success, you are on the home endpoint!');
-})
-
-app.post('/signin', (req, res) => {
-    db.select('email', 'hash').from('login')
-      .where('email', '=', req.body.email)
-      .then(data => {
-          const isValid = bcrypt.compareSync(req.body.password, data[0].hash);
-          if (isValid) {
-              return db.select('*').from('users')
-                .where('email', '=', req.body.email)
-                .then(user => {
-                    res.json(user[0])
-                })
-                .catch(err => res.status(400).json('unable to get user'))
-          } else {
-            res.status(400).json('wrong credentials');
-          }
-      })
-      .catch(err => res.status(400).json('wrong credentials'))
-})
-
+app.get('/', (req, res) => { res.send('success, you are on the home endpoint!') })
+app.post('/signin', handleSignin(db, bcrypt))
 app.post('/register', (req, res) => { handleRegister(req, res, db, bcrypt) })
-
-app.get('/profile/:id', (req, res) => {
-    const { id } = req.params;
-    db.select('*').from('users').where({id})
-        .then(user => {
-            if (user.length) {
-                res.json(user[0])
-            } else {
-                res.status(400).json('Not Found')
-            }
-        })
-        .catch(err => res.status(400).json('error getting user'))
-})
-
-app.put('/image', (req, res) => {
-    const { id } = req.body;
-    db('users').where('id', '=', id)
-    .increment('entries', 1)
-    .returning('entries')
-    .then(entries => {
-        res.json(entries[0]);
-    })
-    .catch(err => res.status(400).json('unable to get entries'))
-})
+app.get('/profile/:id', (req, res) => { handleProfileGet(req, res, db) })
+app.put('/image', (req, res) => { handleImage(req, res, db) })
 
 app.listen(3000, () => {
     console.log('app is running on port 3000');
